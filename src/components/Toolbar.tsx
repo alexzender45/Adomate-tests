@@ -7,7 +7,6 @@ import {
   Plus, 
   Copy, 
   Trash2, 
-  Save, 
   Download,
   ZoomIn,
   ZoomOut,

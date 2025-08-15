@@ -2,6 +2,12 @@ import { FontOption } from '@/types';
 
 const GOOGLE_FONTS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_FONTS_API_KEY || '';
 
+interface GoogleFontItem {
+  family: string;
+  category: string;
+  variants: string[];
+}
+
 export async function fetchGoogleFonts(): Promise<FontOption[]> {
   // If no API key is provided, return system fonts immediately
   if (!GOOGLE_FONTS_API_KEY) {
@@ -19,7 +25,7 @@ export async function fetchGoogleFonts(): Promise<FontOption[]> {
     }
     
     const data = await response.json();
-    return data.items.map((font: any) => ({
+    return data.items.map((font: GoogleFontItem) => ({
       family: font.family,
       category: font.category,
       variants: font.variants,

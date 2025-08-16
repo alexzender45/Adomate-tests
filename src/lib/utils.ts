@@ -21,6 +21,16 @@ export function createDefaultTextLayer(x: number, y: number): TextLayer {
     textAlign: 'left',
     isSelected: false,
     zIndex: 0,
+    isVisible: true, // Default to visible
+    // Additional properties with default values
+    scale: 1,
+    shadowColor: '#000000',
+    shadowBlur: 0,
+    shadowOffsetX: 0,
+    shadowOffsetY: 0,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    borderColor: '#000000',
   };
 }
 

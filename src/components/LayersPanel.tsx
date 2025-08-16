@@ -3,16 +3,13 @@
 import React, { useState } from 'react';
 import { TextLayer } from '@/types';
 import { reorderLayers, normalizeZIndexes } from '@/lib/utils';
-import { 
-  Layers, 
-  Eye, 
-  EyeOff, 
-  GripVertical, 
+import {
+  Eye,
+  EyeOff,
   Trash2,
   Copy,
-  ChevronUp,
-  ChevronDown,
-  Type
+  Type,
+  GripVertical
 } from 'lucide-react';
 
 interface LayersPanelProps {
@@ -33,22 +30,32 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
   onDuplicateLayer,
 }) => {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
-  const handleDragStart = (index: number) => {
-    setDraggedIndex(index);
+  const handleDragStart = (layerId: string) => {
+    const originalIndex = layers.findIndex(l => l.id === layerId);
+    setDraggedIndex(originalIndex);
   };
 
-  const handleDragOver = (e: React.DragEvent, index: number) => {
+  const handleDragOver = (e: React.DragEvent, targetLayerId: string) => {
     e.preventDefault();
-    if (draggedIndex === null || draggedIndex === index) return;
+    const targetIndex = layers.findIndex(l => l.id === targetLayerId);
+    setDragOverIndex(targetIndex);
 
-    const newLayers = reorderLayers(layers, draggedIndex, index);
+    if (draggedIndex === null || draggedIndex === targetIndex) return;
+
+    const newLayers = reorderLayers(layers, draggedIndex, targetIndex);
     onUpdateLayers(newLayers);
-    setDraggedIndex(index);
+    setDraggedIndex(targetIndex);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverIndex(null);
   };
 
   const handleDragEnd = () => {
     setDraggedIndex(null);
+    setDragOverIndex(null);
     // Ensure z-indexes are normalized after drag operations
     const normalizedLayers = normalizeZIndexes(layers);
     if (JSON.stringify(normalizedLayers.map(l => l.zIndex)) !== JSON.stringify(layers.map(l => l.zIndex))) {
@@ -58,7 +65,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
 
   const handleToggleVisibility = (layerId: string) => {
     const updatedLayers = layers.map(layer =>
-      layer.id === layerId ? { ...layer, opacity: layer.opacity > 0 ? 0 : 1 } : layer
+      layer.id === layerId ? { ...layer, isVisible: !layer.isVisible } : layer
     );
     onUpdateLayers(updatedLayers);
   };
@@ -80,28 +87,15 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
     onUpdateLayers(newLayers);
   };
 
-  const handleDuplicateLayer = (layerId: string) => {
-    const layer = layers.find(l => l.id === layerId);
-    if (!layer) return;
 
-    const duplicatedLayer: TextLayer = {
-      ...layer,
-      id: Math.random().toString(36).substr(2, 9),
-      x: layer.x + 20,
-      y: layer.y + 20,
-      zIndex: Math.max(...layers.map(l => l.zIndex)) + 1,
-    };
-
-    const newLayers = [...layers, duplicatedLayer];
-    // Normalize z-indexes after adding new layer
-    const normalizedLayers = normalizeZIndexes(newLayers);
-    onUpdateLayers(normalizedLayers);
-  };
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-900">Text Layers</h3>
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900">Text Layers</h3>
+          <p className="text-xs text-gray-500 mt-1">Drag to reorder • Higher numbers appear on top</p>
+        </div>
         <div className="text-xs text-gray-500">
           {layers.length} layer{layers.length !== 1 ? 's' : ''}
         </div>
@@ -117,48 +111,84 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
         </div>
       ) : (
         <div className="space-y-2">
-          {layers.map((layer, index) => (
+          {/* Sort layers by z-index in descending order (topmost first) */}
+          {[...layers].sort((a, b) => b.zIndex - a.zIndex).map((layer, index) => (
             <div
               key={layer.id}
+              draggable
+              onDragStart={() => handleDragStart(layer.id)}
+              onDragOver={(e) => handleDragOver(e, layer.id)}
+              onDragLeave={handleDragLeave}
+              onDragEnd={handleDragEnd}
               className={`
                 group relative bg-white border rounded-lg p-3 transition-all duration-200 cursor-pointer
-                ${selectedLayerId === layer.id 
-                  ? 'border-blue-500 shadow-glow bg-blue-50' 
+                ${selectedLayerId === layer.id
+                  ? 'border-blue-500 shadow-glow bg-blue-50'
                   : 'border-gray-200 hover:border-gray-300 hover:shadow-soft'
                 }
+                ${draggedIndex === layers.findIndex(l => l.id === layer.id) ? 'opacity-50 scale-95' : ''}
+                ${dragOverIndex === layers.findIndex(l => l.id === layer.id) && draggedIndex !== layers.findIndex(l => l.id === layer.id) ? 'border-green-400 bg-green-50' : ''}
               `}
               onClick={() => onSelectLayer(layer.id)}
             >
               {/* Layer Content */}
               <div className="flex items-center space-x-3">
+                {/* Drag Handle */}
+                <div className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 transition-colors">
+                  <GripVertical className="w-4 h-4" />
+                </div>
+
                 {/* Layer Icon */}
                 <div className={`
                   w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium
-                  ${selectedLayerId === layer.id 
-                    ? 'bg-blue-500 text-white' 
+                  ${selectedLayerId === layer.id
+                    ? 'bg-blue-500 text-white'
                     : 'bg-gray-100 text-gray-600'
                   }
                 `}>
-                  {index + 1}
+                  {layers.length - index}
                 </div>
 
                 {/* Layer Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium text-gray-900 truncate">
+                    <p className={`text-sm font-medium truncate ${
+                      layer.isVisible ? 'text-gray-900' : 'text-gray-500'
+                    }`}>
                       {layer.text || 'Empty text'}
                     </p>
                     <div className="text-xs text-gray-500">
                       {layer.fontSize}px
                     </div>
                   </div>
-                  <p className="text-xs text-gray-500 truncate">
+                  <p className={`text-xs truncate ${
+                    layer.isVisible ? 'text-gray-500' : 'text-gray-400'
+                  }`}>
                     {layer.fontFamily} • {layer.color}
+                    {!layer.isVisible && ' • Hidden'}
                   </p>
                 </div>
 
                 {/* Action Buttons */}
                 <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggleVisibility(layer.id);
+                    }}
+                    className={`p-1 transition-colors ${
+                      layer.isVisible 
+                        ? 'text-gray-400 hover:text-gray-600' 
+                        : 'text-red-400 hover:text-red-600'
+                    }`}
+                    title={layer.isVisible ? 'Hide layer' : 'Show layer'}
+                  >
+                    {layer.isVisible ? (
+                      <Eye className="w-3 h-3" />
+                    ) : (
+                      <EyeOff className="w-3 h-3" />
+                    )}
+                  </button>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();

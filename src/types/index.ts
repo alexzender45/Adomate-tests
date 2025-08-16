@@ -14,6 +14,15 @@ export interface TextLayer {
   textAlign: 'left' | 'center' | 'right';
   isSelected: boolean;
   zIndex: number;
+  isVisible: boolean; 
+  scale?: number;
+  shadowColor?: string;
+  shadowBlur?: number;
+  shadowOffsetX?: number;
+  shadowOffsetY?: number;
+  backgroundColor?: string;
+  borderWidth?: number;
+  borderColor?: string;
 }
 
 export interface CanvasState {

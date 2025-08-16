@@ -5,8 +5,8 @@ import { TextLayer, FontOption } from '@/types';
 import { fetchGoogleFonts, loadFont, getSystemFonts } from '@/lib/fonts';
 import { 
   Type, 
-  Palette, 
   Eye, 
+  EyeOff,
   AlignLeft, 
   AlignCenter, 
   AlignRight,
@@ -99,9 +99,6 @@ const TextProperties: React.FC<TextPropertiesProps> = ({
     onUpdateLayer({ color });
   };
 
-  const handleOpacityChange = (opacity: number) => {
-    onUpdateLayer({ opacity });
-  };
 
   const handleFontSizeChange = (fontSize: number) => {
     const newFontSize = Math.max(8, Math.min(200, fontSize));
@@ -123,13 +120,7 @@ const TextProperties: React.FC<TextPropertiesProps> = ({
     }
   };
 
-  const handleTextAlignChange = (align: 'left' | 'center' | 'right') => {
-    onUpdateLayer({ textAlign: align });
-  };
 
-  const handleRotationChange = (rotation: number) => {
-    onUpdateLayer({ rotation });
-  };
 
   const handleTextChange = (text: string) => {
     onUpdateLayer({ text });
@@ -166,13 +157,61 @@ const TextProperties: React.FC<TextPropertiesProps> = ({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-gray-900">Text Properties</h3>
-        <button
-          onClick={onDeleteLayer}
-          className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-          title="Delete layer"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
+        <div className="flex items-center space-x-2">
+          {/* Hide/Show Toggle */}
+          <button
+            onClick={() => onUpdateLayer({ isVisible: !selectedLayer.isVisible })}
+            className={`p-2 rounded-lg transition-colors ${
+              selectedLayer.isVisible 
+                ? 'text-gray-600 hover:text-gray-800 hover:bg-gray-100' 
+                : 'text-red-500 hover:text-red-700 hover:bg-red-50'
+            }`}
+            title={selectedLayer.isVisible ? 'Hide layer' : 'Show layer'}
+          >
+            {selectedLayer.isVisible ? (
+              <Eye className="w-4 h-4" />
+            ) : (
+              <EyeOff className="w-4 h-4" />
+            )}
+          </button>
+          
+          {/* Delete Button */}
+          <button
+            onClick={onDeleteLayer}
+            className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+            title="Delete layer"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Visibility Status */}
+      <div className={`p-3 rounded-lg border ${
+        selectedLayer.isVisible 
+          ? 'bg-green-50 border-green-200' 
+          : 'bg-red-50 border-red-200'
+      }`}>
+        <div className="flex items-center space-x-2">
+          {selectedLayer.isVisible ? (
+            <Eye className="w-4 h-4 text-green-600" />
+          ) : (
+            <EyeOff className="w-4 h-4 text-red-600" />
+          )}
+          <span className={`text-sm font-medium ${
+            selectedLayer.isVisible ? 'text-green-800' : 'text-red-800'
+          }`}>
+            {selectedLayer.isVisible ? 'Layer is visible' : 'Layer is hidden'}
+          </span>
+        </div>
+        <p className={`text-xs mt-1 ${
+          selectedLayer.isVisible ? 'text-green-600' : 'text-red-600'
+        }`}>
+          {selectedLayer.isVisible 
+            ? 'This text layer is currently visible on the canvas.' 
+            : 'This text layer is hidden and will not appear in exports.'
+          }
+        </p>
       </div>
 
       {/* Text Content */}
@@ -186,6 +225,144 @@ const TextProperties: React.FC<TextPropertiesProps> = ({
           placeholder="Enter your text here..."
           style={{ color: '#000000' }}
         />
+      </div>
+
+      {/* Rotation - Moved to top for visibility */}
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-gray-900">Rotation</label>
+        
+        {/* Quick rotation buttons */}
+        <div className="flex space-x-2 mb-3">
+          <button
+            onClick={() => {
+              console.log('Setting rotation to 0');
+              onUpdateLayer({ rotation: 0 });
+            }}
+            className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+            title="Reset rotation (0°)"
+          >
+            0°
+          </button>
+          <button
+            onClick={() => {
+              console.log('Setting rotation to 45');
+              onUpdateLayer({ rotation: 45 });
+            }}
+            className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+            title="45° rotation"
+          >
+            45°
+          </button>
+          <button
+            onClick={() => {
+              console.log('Setting rotation to 90');
+              onUpdateLayer({ rotation: 90 });
+            }}
+            className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+            title="90° rotation"
+          >
+            90°
+          </button>
+          <button
+            onClick={() => {
+              console.log('Setting rotation to 180');
+              onUpdateLayer({ rotation: 180 });
+            }}
+            className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+            title="180° rotation"
+          >
+            180°
+          </button>
+          <button
+            onClick={() => {
+              console.log('Setting rotation to 270');
+              onUpdateLayer({ rotation: 270 });
+            }}
+            className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+            title="270° rotation"
+          >
+            270°
+          </button>
+        </div>
+        
+        <div className="flex items-center space-x-3">
+          <input
+            type="range"
+            min="0"
+            max="360"
+            value={selectedLayer.rotation}
+            onChange={(e) => {
+              const value = parseInt(e.target.value);
+              console.log('Rotation slider changed to:', value);
+              onUpdateLayer({ rotation: value });
+            }}
+            className="flex-1"
+          />
+          <input
+            type="number"
+            min="0"
+            max="360"
+            value={selectedLayer.rotation}
+            onChange={(e) => {
+              const value = parseInt(e.target.value);
+              console.log('Rotation input changed to:', value);
+              onUpdateLayer({ rotation: value });
+            }}
+            className="w-16 p-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black bg-white"
+            style={{ color: '#000000' }}
+          />
+          <button
+            onClick={() => {
+              console.log('Reset rotation clicked');
+              onUpdateLayer({ rotation: 0 });
+            }}
+            className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+            title="Reset rotation"
+          >
+            <RotateCcw className="w-4 h-4" />
+          </button>
+        </div>
+        
+        {/* Rotation preview */}
+        <div className="text-xs text-gray-500 text-center">
+          Current rotation: {selectedLayer.rotation}°
+        </div>
+      </div>
+
+      {/* Opacity - Moved to top for visibility */}
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-gray-900">
+          Opacity: {Math.round(selectedLayer.opacity * 100)}%
+        </label>
+        <div className="flex items-center space-x-3">
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value={selectedLayer.opacity}
+            onChange={(e) => {
+              const value = parseFloat(e.target.value);
+              console.log('Opacity slider changed to:', value);
+              onUpdateLayer({ opacity: value });
+            }}
+            className="flex-1"
+          />
+          <input
+            type="number"
+            min="0"
+            max="1"
+            step="0.01"
+            value={selectedLayer.opacity}
+            onChange={(e) => {
+              const value = parseFloat(e.target.value);
+              console.log('Opacity input changed to:', value);
+              onUpdateLayer({ opacity: value });
+            }}
+            className="w-16 p-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black bg-white"
+            style={{ color: '#000000' }}
+          />
+        </div>
       </div>
 
       {/* Font Family */}
@@ -389,37 +566,6 @@ const TextProperties: React.FC<TextPropertiesProps> = ({
               style={{ color: '#000000' }}
             />
           </div>
-        </div>
-      </div>
-
-      {/* Rotation */}
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-gray-900">Rotation</label>
-        <div className="flex items-center space-x-3">
-          <input
-            type="range"
-            min="0"
-            max="360"
-            value={selectedLayer.rotation}
-            onChange={(e) => onUpdateLayer({ rotation: parseInt(e.target.value) })}
-            className="flex-1"
-          />
-          <input
-            type="number"
-            min="0"
-            max="360"
-            value={selectedLayer.rotation}
-            onChange={(e) => onUpdateLayer({ rotation: parseInt(e.target.value) })}
-            className="w-16 p-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black bg-white"
-            style={{ color: '#000000' }}
-          />
-          <button
-            onClick={() => onUpdateLayer({ rotation: 0 })}
-            className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-            title="Reset rotation"
-          >
-            <RotateCcw className="w-4 h-4" />
-          </button>
         </div>
       </div>
 

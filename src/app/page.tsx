@@ -1,7 +1,6 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { CanvasState, TextLayer, ExportOptions } from '@/types';
 import { createDefaultTextLayer, getNextZIndex, normalizeZIndexes } from '@/lib/utils';
@@ -10,17 +9,8 @@ import TextProperties from '@/components/TextProperties';
 import LayersPanel from '@/components/LayersPanel';
 import ExportPanel from '@/components/ExportPanel';
 import HistoryIndicator from '@/components/HistoryIndicator';
-import { 
-  Upload, 
-  Type, 
-  Layers, 
-  Download,
-  Undo,
-  Redo,
-  Plus,
-  Save,
-  Loader2,
-  RotateCcw
+import {
+  Loader2
 } from 'lucide-react';
 import Toolbar from '@/components/Toolbar';
 
@@ -46,7 +36,6 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<'upload' | 'properties' | 'layers' | 'export'>('upload');
   const [history, setHistory] = useState<CanvasState[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
-  const [isLoading, setIsLoading] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [showGrid, setShowGrid] = useState(false);
 
@@ -122,23 +111,33 @@ export default function Home() {
   // History management
   const addToHistory = useCallback((newState: CanvasState) => {
     setHistory(prevHistory => {
-      // Remove any future history when adding a new state
+      setHistoryIndex(prevIndex => {
+        // Remove any future history when adding a new state
+        const newHistory = prevHistory.slice(0, prevIndex + 1);
+        newHistory.push(newState);
+
+        // Calculate the new index before limiting history
+        let newIndex = newHistory.length - 1;
+
+        // Limit history to MAX_HISTORY_STEPS
+        if (newHistory.length > MAX_HISTORY_STEPS) {
+          newHistory.shift(); // Remove oldest entry
+          newIndex = MAX_HISTORY_STEPS - 1; // Adjust index after removing oldest
+        }
+
+        return newIndex;
+      });
+
+      // Calculate the new history array (same logic as above)
       const newHistory = prevHistory.slice(0, historyIndex + 1);
       newHistory.push(newState);
-      
+
       // Limit history to MAX_HISTORY_STEPS
       if (newHistory.length > MAX_HISTORY_STEPS) {
         newHistory.shift(); // Remove oldest entry
       }
-      
+
       return newHistory;
-    });
-    
-    setHistoryIndex(prevIndex => {
-      const newIndex = prevIndex + 1;
-      // When we reach the limit, we need to adjust the index
-      // The index should always point to the last entry
-      return Math.min(newIndex, MAX_HISTORY_STEPS - 1);
     });
   }, [historyIndex]);
 
@@ -175,10 +174,13 @@ export default function Home() {
       textLayers: [],
       selectedLayerId: null,
     };
+
+    // Reset history when uploading a new image (fresh start)
     setCanvasState(newState);
-    addToHistory(newState);
+    setHistory([newState]);
+    setHistoryIndex(0);
     setActiveTab('properties');
-  }, [addToHistory]);
+  }, []);
 
   const handleSelectLayer = useCallback((layerId: string | null) => {
     setCanvasState(prevState => {
@@ -193,13 +195,17 @@ export default function Home() {
 
   const handleUpdateLayer = useCallback((updates: Partial<TextLayer>) => {
     setCanvasState(prevState => {
-      if (!prevState.selectedLayerId) return prevState;
+      if (!prevState.selectedLayerId) {
+        return prevState;
+      }
 
+      console.log('Updating layer:', prevState.selectedLayerId);
       const updatedLayers = prevState.textLayers.map(layer =>
         layer.id === prevState.selectedLayerId ? { ...layer, ...updates } : layer
       );
 
       const newState = { ...prevState, textLayers: updatedLayers };
+      console.log('New state:', newState);
       addToHistory(newState);
       return newState;
     });
@@ -230,7 +236,7 @@ export default function Home() {
 
       const duplicatedLayer: TextLayer = {
         ...layer,
-        id: Math.random().toString(36).substr(2, 9),
+        id: Math.random().toString(36).substring(2, 11),
         x: layer.x + 20,
         y: layer.y + 20,
         zIndex: getNextZIndex(prevState.textLayers),
@@ -294,15 +300,18 @@ export default function Home() {
           // Draw image
           ctx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
           
-          // Draw text layers
-          canvasState.textLayers.forEach(layer => {
-            if (layer.opacity > 0) {
+          // Draw text layers in z-index order (same as Canvas component)
+          const sortedLayers = [...canvasState.textLayers].sort((a, b) => a.zIndex - b.zIndex);
+
+          sortedLayers.forEach(layer => {
+            if (layer.opacity > 0 && layer.isVisible) {
               ctx.save();
               ctx.globalAlpha = layer.opacity;
               ctx.font = `${layer.fontWeight === 'bold' ? 'bold' : 'normal'} ${layer.fontSize * options.scale}px ${layer.fontFamily}`;
               ctx.fillStyle = layer.color;
               ctx.textAlign = layer.textAlign;
-              
+              ctx.textBaseline = 'alphabetic'; // Set consistent baseline
+
               // Apply rotation
               if (layer.rotation !== 0) {
                 ctx.translate(layer.x * options.scale, layer.y * options.scale);
@@ -311,7 +320,7 @@ export default function Home() {
               } else {
                 ctx.fillText(layer.text, layer.x * options.scale, layer.y * options.scale);
               }
-              
+
               ctx.restore();
             }
           });
@@ -332,7 +341,28 @@ export default function Home() {
     });
   }, [canvasState]);
 
-  const selectedLayer = canvasState.selectedLayerId 
+  // Quick export function for toolbar
+  const handleQuickExport = useCallback(async () => {
+    if (!canvasState.image) return;
+
+    try {
+      const dataUrl = await handleExport({ format: 'png', quality: 1, scale: 1 });
+      const filename = `image-text-composer-${Date.now()}.png`;
+
+      // Download the image
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = dataUrl;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('Failed to export image. Please try again.');
+    }
+  }, [canvasState.image, handleExport]);
+
+  const selectedLayer = canvasState.selectedLayerId
     ? canvasState.textLayers.find(layer => layer.id === canvasState.selectedLayerId) || null
     : null;
 
@@ -412,8 +442,8 @@ export default function Home() {
             </div>
             <div className="flex items-center space-x-4">
               <Toolbar
-                canUndo={historyIndex > 0}
-                canRedo={historyIndex < history.length - 1}
+                canUndo={canUndo}
+                canRedo={canRedo}
                 hasImage={!!canvasState.image}
                 hasSelectedLayer={!!canvasState.selectedLayerId}
                 showGrid={showGrid}
@@ -422,7 +452,7 @@ export default function Home() {
                 onAddText={handleAddTextLayer}
                 onDuplicateLayer={() => canvasState.selectedLayerId && handleDuplicateLayer(canvasState.selectedLayerId)}
                 onDeleteLayer={() => canvasState.selectedLayerId && handleDeleteLayer(canvasState.selectedLayerId)}
-                onExport={() => handleExport({ format: 'png', quality: 1, scale: 1 })}
+                onExport={handleQuickExport}
                 onResetZoom={() => setZoom(1)}
                 onZoomIn={() => setZoom(prev => Math.min(3, prev + 0.1))}
                 onZoomOut={() => setZoom(prev => Math.max(0.1, prev - 0.1))}
@@ -438,7 +468,7 @@ export default function Home() {
         {/* Left Sidebar */}
         <div className="w-80 bg-white/90 backdrop-blur-sm border-r border-gray-200/50 flex flex-col">
           <div className="flex-1 overflow-hidden">
-            <div className="p-4">
+            <div className="p-4 h-full overflow-y-auto">
               <div className="flex space-x-1 mb-4">
                 <button
                   onClick={() => setActiveTab('upload')}
@@ -469,6 +499,16 @@ export default function Home() {
                   }`}
                 >
                   Properties
+                </button>
+                <button
+                  onClick={() => setActiveTab('export')}
+                  className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                    activeTab === 'export'
+                      ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Export
                 </button>
               </div>
 
@@ -507,6 +547,14 @@ export default function Home() {
                     />
                   </div>
                 )}
+                {activeTab === 'export' && (
+                  <div className="fade-in">
+                    <ExportPanel
+                      canvasState={canvasState}
+                      onExport={handleExport}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -533,8 +581,8 @@ export default function Home() {
         historyLength={history.length}
         currentIndex={historyIndex}
         maxSteps={MAX_HISTORY_STEPS}
-        canUndo={historyIndex > 0}
-        canRedo={historyIndex < history.length - 1}
+        canUndo={canUndo}
+        canRedo={canRedo}
         onUndo={undo}
         onRedo={redo}
       />

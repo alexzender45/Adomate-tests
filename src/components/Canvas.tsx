@@ -1,9 +1,8 @@
 'use client';
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { TextLayer, CanvasState } from '@/types';
+import { CanvasState } from '@/types';
 import { createDefaultTextLayer, getNextZIndex } from '@/lib/utils';
-import { Loader2 } from 'lucide-react';
 
 interface CanvasProps {
   canvasState: CanvasState;
@@ -25,7 +24,7 @@ const Canvas: React.FC<CanvasProps> = ({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [imageElement, setImageElement] = useState<HTMLImageElement | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [, setDragStart] = useState({ x: 0, y: 0 });
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
@@ -82,7 +81,7 @@ const Canvas: React.FC<CanvasProps> = ({
     const sortedLayers = [...canvasState.textLayers].sort((a, b) => a.zIndex - b.zIndex);
     
     sortedLayers.forEach(layer => {
-      if (layer.opacity > 0) {
+      if (layer.opacity > 0 && layer.isVisible) {
         ctx.save();
         ctx.globalAlpha = layer.opacity;
         ctx.font = `${layer.fontWeight === 'bold' ? 'bold' : 'normal'} ${layer.fontSize * zoom}px ${layer.fontFamily}`;
@@ -251,7 +250,7 @@ const Canvas: React.FC<CanvasProps> = ({
     const tempCtx = tempCanvas.getContext('2d');
     
     for (const layer of sortedLayers) {
-      if (layer.opacity > 0 && tempCtx) {
+      if (layer.opacity > 0 && layer.isVisible && tempCtx) {
         // Set up the font for measurement
         tempCtx.font = `${layer.fontWeight === 'bold' ? 'bold' : 'normal'} ${layer.fontSize}px ${layer.fontFamily}`;
         
@@ -466,12 +465,35 @@ const Canvas: React.FC<CanvasProps> = ({
           }
           nudgeLayer(selectedId, direction, amount);
         }
+
+        // Handle rotation shortcuts
+        if (e.key === 'r' || e.key === 'R') {
+          e.preventDefault();
+          const layer = canvasState.textLayers.find(l => l.id === selectedId);
+          if (layer) {
+            const rotationAmount = e.shiftKey ? 45 : 15; // 45° with Shift, 15° without
+            const newRotation = (layer.rotation + rotationAmount) % 360;
+            const updatedLayers = canvasState.textLayers.map(l =>
+              l.id === selectedId ? { ...l, rotation: newRotation } : l
+            );
+            onUpdateCanvas({ textLayers: updatedLayers });
+          }
+        }
+
+        // Handle rotation reset
+        if (e.key === '0') {
+          e.preventDefault();
+          const updatedLayers = canvasState.textLayers.map(l =>
+            l.id === selectedId ? { ...l, rotation: 0 } : l
+          );
+          onUpdateCanvas({ textLayers: updatedLayers });
+        }
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [selectedId, editingLayerId, nudgeLayer]);
+  }, [selectedId, editingLayerId, nudgeLayer, canvasState.textLayers, onUpdateCanvas]);
 
   // Remove the conflicting keyboard event handler from Canvas
   // The main page will handle keyboard events
